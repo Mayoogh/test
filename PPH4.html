@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <title>Test Log & Throughput Calculator</title>
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 40px;
+      background-color: #121212;
+      color: #eee;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      align-items: start;
+    }
+
+    .input-section {
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #444;
+    }
+
+    .results-section {
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #444;
+      position: sticky;
+      top: 20px;
+      height: fit-content;
+    }
+
+    h2 {
+      text-align: center;
+      margin-top: 0;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+      align-items: center;
+    }
+
+    .row label {
+      text-align: right;
+      padding-right: 10px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="time"],
+    input[type="date"] {
+      padding: 8px;
+      background-color: #2a2a2a;
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 4px;
+      width: 100%;
+    }
+
+    .bot-ids {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    #battery-section {
+      max-height: 200px;
+      overflow-y: auto;
+      margin: 15px 0;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 15px;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .results-section h3 {
+      margin-top: 0;
+      color: #4CAF50;
+    }
+
+    .result-item {
+      background-color: #252525;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      
+      .results-section {
+        position: static;
+      }
+      
+      body {
+        margin: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="input-section">
+      <h2>Test Log & Throughput Calculator</h2>
+
+      <div class="row">
+        <label for="date">Date</label>
+        <input type="date" id="date">
+      </div>
+
+      <div class="row">
+        <label for="session">Session #</label>
+        <input type="number" id="session">
+      </div>
+
+      <div class="row">
+        <label>Bot IDs</label>
+        <div class="bot-ids">
+          <label><input type="checkbox" class="bot-checkbox" value="B2" onchange="updateBotCount()"> B2</label>
+          <label><input type="checkbox" class="bot-checkbox" value="B3" onchange="updateBotCount()"> B3</label>
+          <label><input type="checkbox" class="bot-checkbox" value="B4" onchange="updateBotCount()"> B4</label>
+          <label><input type="checkbox" class="bot-checkbox" value="B5" onchange="updateBotCount()"> B5</label>
+          <label><input type="checkbox" class="bot-checkbox" value="B6" onchange="updateBotCount()"> B6</label>
+        </div>
+      </div>
+
+      <div class="row">
+        <label>No. of Bots</label>
+        <input type="number" id="bots" readonly>
+      </div>
+
+      <div id="battery-section"></div>
+
+      <div class="row">
+        <label>Sortation Start Time</label>
+        <input type="time" id="start">
+      </div>
+
+      <div class="row">
+        <label>Sortation Stop Time</label>
+        <input type="time" id="end">
+      </div>
+
+      <div class="row">
+        <label>Infeeding Interval (s)</label>
+        <input type="number" id="infeed_interval" placeholder="Seconds between each infeed">
+      </div>
+
+      <div class="row">
+        <label>Packets Available</label>
+        <input type="number" id="available">
+      </div>
+
+      <div class="row">
+        <label>Packets Sorted</label>
+        <input type="number" id="sorted">
+      </div>
+
+      <div class="row">
+        <label>Wrong Sorted</label>
+        <input type="number" id="false">
+      </div>
+
+      <div class="row">
+        <label>Out of Bin</label>
+        <input type="number" id="outside">
+      </div>
+
+      <div class="row">
+        <label>Rejections</label>
+        <input type="number" id="rejection">
+      </div>
+
+      <div class="row">
+        <label>Remarks</label>
+        <input type="text" id="remarks" placeholder="Enter remarks">
+      </div>
+
+      <button onclick="calculatePPH()">Calculate Throughput</button>
+    </div>
+
+    <div class="results-section">
+      <h3>Performance Summary</h3>
+      <div class="result-item" id="sortation_time"></div>
+      <div class="result-item" id="result"></div>
+      <div class="result-item" id="bot_runtimes"></div>
+    </div>
+  </div>
+
+  <script>
+    let botRuntimes = [];
+
+    function updateBotCount() {
+      const checkboxes = document.querySelectorAll('.bot-checkbox');
+      const batterySection = document.getElementById("battery-section");
+      const checked = Array.from(checkboxes).filter(cb => cb.checked);
+      document.getElementById("bots").value = checked.length;
+
+      batterySection.innerHTML = '';
+      checked.forEach(cb => {
+        const botId = cb.value;
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = ` 
+          <label>${botId} Battery (V)</label>
+          <input type="number" id="battery-${botId}" placeholder="Enter voltage" step="0.01">
+        `;
+        batterySection.appendChild(row);
+      });
+    }
+
+    function calculatePPH() {
+      let start = document.getElementById("start").value;
+      let end = document.getElementById("end").value;
+      let sorted = parseInt(document.getElementById("sorted").value) || 0;
+      let falseDrops = parseInt(document.getElementById("false").value) || 0;
+      let outsideDrops = parseInt(document.getElementById("outside").value) || 0;
+      let rejection = parseInt(document.getElementById("rejection").value) || 0;
+
+      let startTime = new Date("1970-01-01T" + start + "Z");
+      let endTime = new Date("1970-01-01T" + end + "Z");
+
+      let sortationMinutes = (endTime - startTime) / (1000 * 60);
+      let sortationHours = sortationMinutes / 60;
+
+      let infeedInterval = parseFloat(document.getElementById("infeed_interval").value);
+      let infeedThroughput = infeedInterval > 0 ? (3600 / infeedInterval).toFixed(2) : "N/A";
+
+      if (sortationHours <= 0) {
+        alert("End time must be after start time.");
+        return;
+      }
+
+      let pphIncluding = sorted / sortationHours;
+      let pphExcluding = (sorted - falseDrops - outsideDrops - rejection) / sortationHours;
+
+      document.getElementById("sortation_time").innerHTML = `
+        <strong>Sortation Time:</strong><br>
+        ${sortationHours.toFixed(2)} hours (${sortationMinutes.toFixed(0)} minutes)
+      `;
+
+      document.getElementById("result").innerHTML = `
+        <strong>Bot Throughput:</strong><br>
+        Including all: ${pphIncluding.toFixed(2)} pph<br>
+        Excluding errors: ${pphExcluding.toFixed(2)} pph<br><br>
+        <strong>Infeed Throughput:</strong><br>
+        ${infeedThroughput} packets/hour
+      `;
+
+      // Calculate bot runtimes
+      botRuntimes = [];
+      const checkboxes = document.querySelectorAll('.bot-checkbox:checked');
+      checkboxes.forEach(cb => {
+        let botId = cb.value;
+        let botRuntime = (sortationMinutes / 60).toFixed(2);
+        botRuntimes.push({ botId, runtime: botRuntime });
+      });
+
+      displayBotRuntimes();
+    }
+
+    function displayBotRuntimes() {
+      let sessionID = document.getElementById("session").value;
+      let botRuntimeSection = document.getElementById("bot_runtimes");
+      let content = "<strong>Bot Runtimes:</strong><br>";
+      
+      botRuntimes.forEach(bot => {
+        content += `${bot.botId}: ${bot.runtime} hours<br>`;
+      });
+
+      if (sessionID) {
+        content = `<strong>Bot Runtimes (Session #${sessionID}):</strong><br>` + content.split('<br>').slice(1).join('<br>');
+      }
+
+      botRuntimeSection.innerHTML = content;
+    }
+  </script>
+</body>
+</html>
